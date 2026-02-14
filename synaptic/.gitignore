@@ -8,3 +8,4 @@ out/
 next-env.d.ts
 .partykit/
 .DS_Store
+tsconfig.tsbuildinfo
