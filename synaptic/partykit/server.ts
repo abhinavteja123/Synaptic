@@ -25,6 +25,8 @@ interface RoomState {
     text: string;
     timestamp: number;
   }>;
+  /** Shared room data synced from the room creator so other users can join */
+  roomData: Record<string, unknown> | null;
 }
 
 export default class SynapticServer implements Party.Server {
@@ -32,6 +34,7 @@ export default class SynapticServer implements Party.Server {
     players: {},
     currentMood: 'neutral',
     chatHistory: [],
+    roomData: null,
   };
 
   constructor(readonly room: Party.Room) {}
@@ -174,5 +177,48 @@ export default class SynapticServer implements Party.Server {
         conn.send(message);
       }
     }
+  }
+
+  /**
+   * HTTP handler — allows storing/retrieving room data so shared
+   * links work even when the room creator is offline.
+   * POST /parties/main/{roomId} — store room data
+   * GET  /parties/main/{roomId} — retrieve room data
+   */
+  async onRequest(req: Party.Request): Promise<Response> {
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Content-Type': 'application/json',
+    };
+
+    if (req.method === 'OPTIONS') {
+      return new Response(null, { headers: corsHeaders });
+    }
+
+    if (req.method === 'POST') {
+      try {
+        const body = await req.json();
+        this.state.roomData = body as Record<string, unknown>;
+        return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
+      } catch {
+        return new Response(JSON.stringify({ success: false, error: 'Invalid JSON' }), {
+          status: 400,
+          headers: corsHeaders,
+        });
+      }
+    }
+
+    if (req.method === 'GET') {
+      if (this.state.roomData) {
+        return new Response(JSON.stringify({ success: true, data: this.state.roomData }), {
+          headers: corsHeaders,
+        });
+      }
+      return new Response(JSON.stringify({ success: false }), { headers: corsHeaders });
+    }
+
+    return new Response('Not found', { status: 404, headers: corsHeaders });
   }
 }

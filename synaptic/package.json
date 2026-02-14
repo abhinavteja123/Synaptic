@@ -12,7 +12,7 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "partykit:dev": "npx partykit dev",
+    "partykit:dev": "npx partykit dev --port 1999",
     "partykit:deploy": "npx partykit deploy"
   },
   "dependencies": {

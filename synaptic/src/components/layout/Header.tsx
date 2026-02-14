@@ -45,10 +45,13 @@ export default function Header() {
 
           {isLoggedIn ? (
             <div className="flex items-center gap-3 ml-2">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5">
+              <Link
+                href="/profile"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+              >
                 <User className="h-4 w-4 text-primary-400" />
                 <span className="text-sm text-white/80">{user?.name}</span>
-              </div>
+              </Link>
               <button
                 onClick={handleSignout}
                 className="text-white/50 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5"

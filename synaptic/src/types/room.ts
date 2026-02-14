@@ -16,6 +16,8 @@ export interface Photo {
   url: string;
   /** Optional user-provided caption */
   caption?: string;
+  /** Voice note audio (base64 data URL) */
+  voiceNote?: string;
   /** Original filename */
   filename?: string;
   /** When the photo was taken (if available from EXIF) */
@@ -150,10 +152,24 @@ export interface MemoryRoom {
   audioNarration?: string;
   /** TTS audio URL for narration */
   narrationAudioUrl?: string;
+  /** Room visual theme key (from ROOM_THEMES) */
+  theme?: string;
+  /** Collaborator user IDs (couples/group rooms) */
+  collaborators?: string[];
+  /** Invite code for joining the room as collaborator */
+  inviteCode?: string;
   /** Whether this room is publicly accessible */
   isPublic: boolean;
   /** Whether this is a Legacy Mode room */
   isLegacy: boolean;
+  /** Time-locked until this date (Memory Capsule) */
+  lockedUntil?: Date;
+  /** AI-generated relationship story */
+  relationshipStory?: string;
+  /** Mood check-in on entry */
+  entryMood?: string;
+  /** Mood check-in on exit */
+  exitMood?: string;
   /** Legacy mode: person's name */
   legacyPersonName?: string;
   /** Legacy mode: relationship */

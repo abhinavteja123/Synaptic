@@ -16,8 +16,8 @@ export async function POST(req: NextRequest) {
     if (!files.length) {
       return NextResponse.json({ success: false, error: 'No photos provided' }, { status: 400 });
     }
-    if (files.length > 5) {
-      return NextResponse.json({ success: false, error: 'Maximum 5 photos allowed' }, { status: 400 });
+    if (files.length > 10) {
+      return NextResponse.json({ success: false, error: 'Maximum 10 photos allowed' }, { status: 400 });
     }
 
     // Convert files to base64 data URLs (sent to Groq vision, max 4MB per image)

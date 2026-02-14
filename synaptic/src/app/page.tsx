@@ -43,7 +43,7 @@ const features = [
 ];
 
 const steps = [
-  { num: '01', title: 'Upload Photos', desc: 'Add 2-5 photos from your memory' },
+  { num: '01', title: 'Upload Photos', desc: 'Add 2-10 photos from your memory' },
   { num: '02', title: 'Describe the Moment', desc: 'Tell us what made it special' },
   { num: '03', title: 'AI Creates Your Space', desc: 'Watch your memory become a 3D world' },
   { num: '04', title: 'Share & Explore', desc: 'Invite loved ones to walk through it together' },

@@ -4,14 +4,15 @@
  * Create Room Page – Multi-step form for building a memory room
  */
 
-import { useState } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sparkles, Mic, Square } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import PhotoUpload from '@/components/ui/PhotoUpload';
 import LoadingRoom from '@/components/ui/LoadingRoom';
 import { compressImage, convertToBase64 } from '@/lib/utils/imageProcessing';
 import { saveRoom } from '@/lib/db';
+import { ROOM_THEMES } from '@/lib/constants';
 import { nanoid } from 'nanoid';
 import { useAuth } from '@/hooks/useAuth';
 import type { MemoryRoom, Photo } from '@/types/room';
@@ -30,16 +31,90 @@ export default function CreateRoomPage() {
 
   // Form state
   const [photos, setPhotos] = useState<File[]>([]);
+  const [photoCaptions, setPhotoCaptions] = useState<Record<number, string>>({});
+  const [captioningIdx, setCaptioningIdx] = useState<Set<number>>(new Set());
   const [description, setDescription] = useState('');
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState('');
   const [isPublic, setIsPublic] = useState(false);
   const [isLegacy, setIsLegacy] = useState(false);
+  const [roomTheme, setRoomTheme] = useState('valentine');
+  const [lockDate, setLockDate] = useState('');
+  const [voiceNotes, setVoiceNotes] = useState<Record<number, string>>({});
+  const [recordingIdx, setRecordingIdx] = useState<number | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
   // Generation state
   const [generating, setGenerating] = useState(false);
   const [genStep, setGenStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  /** Auto-caption a single photo using AI vision */
+  const captionPhoto = useCallback(async (file: File, index: number) => {
+    try {
+      setCaptioningIdx(prev => new Set(prev).add(index));
+      const base64 = await convertToBase64(file);
+      const res = await fetch('/api/caption-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageDataUrl: base64 }),
+      });
+      const data = await res.json();
+      if (data.success && data.caption) {
+        setPhotoCaptions(prev => ({ ...prev, [index]: data.caption }));
+      }
+    } catch (err) {
+      console.error('Auto-caption failed for photo', index, err);
+    } finally {
+      setCaptioningIdx(prev => { const s = new Set(prev); s.delete(index); return s; });
+    }
+  }, []);
+
+  /** Handle photo changes — auto-caption new additions */
+  const handlePhotosChange = useCallback((files: File[]) => {
+    const prevCount = photos.length;
+    setPhotos(files);
+    // Caption any newly added photos
+    files.forEach((file, i) => {
+      if (i >= prevCount && !photoCaptions[i]) {
+        captionPhoto(file, i);
+      }
+    });
+  }, [photos.length, photoCaptions, captionPhoto]);
+
+  /** Start recording a voice note for a photo */
+  const startRecording = useCallback(async (index: number) => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      const chunks: Blob[] = [];
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setVoiceNotes(prev => ({ ...prev, [index]: reader.result as string }));
+        };
+        reader.readAsDataURL(blob);
+        setRecordingIdx(null);
+      };
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start();
+      setRecordingIdx(index);
+      // Auto-stop after 30 seconds
+      setTimeout(() => { if (mediaRecorder.state === 'recording') mediaRecorder.stop(); }, 30000);
+    } catch (err) {
+      console.error('Mic access denied:', err);
+    }
+  }, []);
+
+  /** Stop recording the current voice note */
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+  }, []);
 
   const canNext = () => {
     if (step === 1) return photos.length >= 2;
@@ -65,7 +140,8 @@ export default function CreateRoomPage() {
         compressedPhotos.push({
           id: nanoid(8),
           url: base64,
-          caption: '',
+          caption: photoCaptions[i] || '',
+          voiceNote: voiceNotes[i] || undefined,
           filename: photos[i].name,
           uploadedAt: new Date(),
         });
@@ -103,8 +179,10 @@ export default function CreateRoomPage() {
         tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
         photos: compressedPhotos,
         sceneData: sceneData.sceneData,
+        theme: roomTheme,
         isPublic,
         isLegacy,
+        lockedUntil: lockDate ? new Date(lockDate) : undefined,
         visitCount: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -150,7 +228,7 @@ export default function CreateRoomPage() {
           {step === 3 && 'Final Details'}
         </h1>
         <p className="text-white/50 text-sm mb-8">
-          {step === 1 && 'Add 2–5 photos from the memory you want to preserve'}
+          {step === 1 && 'Add 2–10 photos from the memory you want to preserve'}
           {step === 2 && 'Tell us what made this moment special'}
           {step === 3 && 'Give your room a title and optional tags'}
         </p>
@@ -163,7 +241,58 @@ export default function CreateRoomPage() {
 
         {/* Step 1: Photos */}
         {step === 1 && (
-          <PhotoUpload value={photos} onChange={setPhotos} maxFiles={5} />
+          <div className="space-y-4">
+            <PhotoUpload value={photos} onChange={handlePhotosChange} maxFiles={10} />
+            {/* AI Captions */}
+            {photos.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs text-white/40 flex items-center gap-2">
+                  <span className="text-base">✨</span> AI is generating captions for your photos
+                </p>
+                <div className="grid grid-cols-1 gap-2">
+                  {photos.map((file, i) => (
+                    <div key={i} className="flex items-center gap-3 rounded-lg bg-white/[0.04] border border-white/10 px-3 py-2">
+                      <span className="text-xs text-white/30 w-5 flex-shrink-0">#{i + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        {captioningIdx.has(i) ? (
+                          <span className="text-xs text-purple-400 animate-pulse">Generating caption...</span>
+                        ) : photoCaptions[i] ? (
+                          <span className="text-sm text-white/70 italic truncate block">&ldquo;{photoCaptions[i]}&rdquo;</span>
+                        ) : (
+                          <span className="text-xs text-white/30 truncate block">{file.name}</span>
+                        )}
+                        {voiceNotes[i] && (
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <span className="text-[10px] text-green-400">🎤 Voice note recorded</span>
+                            <audio src={voiceNotes[i]} controls className="h-6 w-32" style={{ filter: 'invert(0.8)' }} />
+                          </div>
+                        )}
+                      </div>
+                      {/* Voice note record button */}
+                      {recordingIdx === i ? (
+                        <button
+                          onClick={stopRecording}
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-red-500/20 border border-red-400/30 text-red-400 text-xs animate-pulse"
+                          title="Stop recording"
+                        >
+                          <Square className="h-3 w-3" /> Stop
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => startRecording(i)}
+                          disabled={recordingIdx !== null}
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.06] border border-white/10 text-white/50 text-xs hover:text-white hover:bg-white/10 disabled:opacity-30 transition-all"
+                          title="Record voice note (max 30s)"
+                        >
+                          <Mic className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Step 2: Description */}
@@ -183,7 +312,7 @@ export default function CreateRoomPage() {
 
         {/* Step 3: Details */}
         {step === 3 && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div>
               <label className="block text-sm text-white/60 mb-1.5">Room Title *</label>
               <input
@@ -204,6 +333,59 @@ export default function CreateRoomPage() {
                 className="w-full rounded-xl bg-white/[0.04] border border-white/10 px-4 py-3 text-sm text-white placeholder-white/30 outline-none focus:border-primary-500/50"
               />
             </div>
+
+            {/* Room Theme Picker */}
+            <div>
+              <label className="block text-sm text-white/60 mb-2">Room Theme</label>
+              <div className="grid grid-cols-4 gap-2">
+                {Object.entries(ROOM_THEMES).map(([key, t]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setRoomTheme(key)}
+                    className={`relative flex flex-col items-center gap-1.5 rounded-xl p-3 border transition-all duration-200 ${
+                      roomTheme === key
+                        ? 'bg-white/10 border-purple-400/60 ring-1 ring-purple-400/30 scale-[1.02]'
+                        : 'bg-white/[0.03] border-white/10 hover:bg-white/[0.06] hover:border-white/20'
+                    }`}
+                  >
+                    <span className="text-xl">{t.emoji}</span>
+                    <span className={`text-xs font-medium ${roomTheme === key ? 'text-white' : 'text-white/50'}`}>{t.name}</span>
+                    <div className="flex gap-1 mt-0.5">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ background: t.accent }} />
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ background: t.accentLight }} />
+                    </div>
+                    {roomTheme === key && (
+                      <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-purple-500 flex items-center justify-center">
+                        <span className="text-white text-[10px]">✓</span>
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Memory Capsule – Time Lock */}
+            <div>
+              <label className="block text-sm text-white/60 mb-1.5">🔒 Memory Capsule (optional)</label>
+              <p className="text-xs text-white/30 mb-2">Lock this room until a future date — it becomes a time capsule!</p>
+              <input
+                type="datetime-local"
+                value={lockDate}
+                onChange={(e) => setLockDate(e.target.value)}
+                min={new Date().toISOString().slice(0, 16)}
+                className="w-full rounded-xl bg-white/[0.04] border border-white/10 px-4 py-3 text-sm text-white placeholder-white/30 outline-none focus:border-primary-500/50 [color-scheme:dark]"
+              />
+              {lockDate && (
+                <button
+                  onClick={() => setLockDate('')}
+                  className="mt-1.5 text-xs text-red-400/70 hover:text-red-400 transition-colors"
+                >
+                  ✕ Remove time lock
+                </button>
+              )}
+            </div>
+
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input

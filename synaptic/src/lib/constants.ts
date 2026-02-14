@@ -267,12 +267,15 @@ export const AUDIO_PATHS = {
 //  ROOM THEMES
 // ============================================
 
-export const ROOM_THEMES: Record<string, { name: string; floor: string; wall: string; accent: string; accentLight: string; glow: string }> = {
-  midnight: { name: 'Midnight', floor: '#0a0a15', wall: '#0e0e1a', accent: '#6366f1', accentLight: '#c4b5fd', glow: '#8b5cf6' },
-  warm: { name: 'Warm Gold', floor: '#1a1208', wall: '#1a1510', accent: '#f59e0b', accentLight: '#fde68a', glow: '#d97706' },
-  neon: { name: 'Neon Pink', floor: '#0f0518', wall: '#12051f', accent: '#ec4899', accentLight: '#f9a8d4', glow: '#db2777' },
-  ocean: { name: 'Ocean', floor: '#051015', wall: '#0a1520', accent: '#06b6d4', accentLight: '#67e8f9', glow: '#0891b2' },
-  forest: { name: 'Forest', floor: '#080f08', wall: '#0a150e', accent: '#22c55e', accentLight: '#86efac', glow: '#16a34a' },
+export const ROOM_THEMES: Record<string, { name: string; emoji: string; floor: string; wall: string; accent: string; accentLight: string; glow: string }> = {
+  valentine: { name: 'Valentine', emoji: '💝', floor: '#1a0510', wall: '#1f0815', accent: '#f43f5e', accentLight: '#fda4af', glow: '#e11d48' },
+  love:      { name: 'Love',      emoji: '❤️', floor: '#1a0808', wall: '#1f0a0a', accent: '#ef4444', accentLight: '#fca5a5', glow: '#dc2626' },
+  friends:   { name: 'Friends',   emoji: '🤝', floor: '#0a0a15', wall: '#0e0e1a', accent: '#6366f1', accentLight: '#c4b5fd', glow: '#8b5cf6' },
+  family:    { name: 'Family',    emoji: '🏠', floor: '#1a1208', wall: '#1a1510', accent: '#f59e0b', accentLight: '#fde68a', glow: '#d97706' },
+  siblings:  { name: 'Siblings',  emoji: '👫', floor: '#051015', wall: '#0a1520', accent: '#06b6d4', accentLight: '#67e8f9', glow: '#0891b2' },
+  adventure: { name: 'Adventure', emoji: '🌄', floor: '#080f08', wall: '#0a150e', accent: '#22c55e', accentLight: '#86efac', glow: '#16a34a' },
+  nostalgia: { name: 'Nostalgia', emoji: '📷', floor: '#12100a', wall: '#181510', accent: '#d4a574', accentLight: '#e8c9a0', glow: '#b8956a' },
+  midnight:  { name: 'Midnight',  emoji: '🌙', floor: '#050510', wall: '#08081a', accent: '#818cf8', accentLight: '#c7d2fe', glow: '#6366f1' },
 };
 
 // ============================================

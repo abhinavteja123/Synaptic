@@ -50,7 +50,7 @@ export function useMultiplayer({
   useEffect(() => {
     if (!enabled || !roomId) return;
 
-    const host = process.env.NEXT_PUBLIC_PARTYKIT_URL || 'localhost:1999';
+    const host = process.env.NEXT_PUBLIC_PARTYKIT_HOST || 'localhost:1999';
     const socket = new PartySocket({
       host,
       room: roomId,

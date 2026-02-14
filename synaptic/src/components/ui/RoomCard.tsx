@@ -5,16 +5,17 @@
  */
 
 import Link from 'next/link';
-import { Calendar, Globe, Lock, Trash2 } from 'lucide-react';
+import { Calendar, Globe, Lock, Trash2, Pencil } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { MemoryRoom } from '@/types/room';
 
 interface RoomCardProps {
   room: MemoryRoom;
   onDelete?: (id: string) => void;
+  onEdit?: (room: MemoryRoom) => void;
 }
 
-export default function RoomCard({ room, onDelete }: RoomCardProps) {
+export default function RoomCard({ room, onDelete, onEdit }: RoomCardProps) {
   const thumbnail =
     room.photos[0]?.url ||
     room.sceneData?.panoramaUrl ||
@@ -41,6 +42,15 @@ export default function RoomCard({ room, onDelete }: RoomCardProps) {
           >
             Enter
           </Link>
+          {onEdit && (
+            <button
+              onClick={(e) => { e.preventDefault(); onEdit(room); }}
+              className="rounded-lg bg-blue-600/80 px-2 py-1.5 text-white/80 hover:text-white hover:bg-blue-500 transition"
+              aria-label="Edit room"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
           {onDelete && (
             <button
               onClick={(e) => { e.preventDefault(); onDelete(room.id); }}

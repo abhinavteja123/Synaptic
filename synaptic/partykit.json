@@ -1,6 +1,6 @@
 {
   "name": "synaptic",
-  "url": "http://localhost:3000",
   "$schema": "https://unpkg.com/partykit/schema.json",
-  "main": "partykit/server.ts"
+  "main": "partykit/server.ts",
+  "compatibilityDate": "2026-02-14"
 }

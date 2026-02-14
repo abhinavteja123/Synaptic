@@ -65,7 +65,11 @@ export async function getRoomById(id: string): Promise<MemoryRoom | undefined> {
 
 /** Get all rooms for a specific user, newest first */
 export async function getRoomsByUser(userId: string): Promise<MemoryRoom[]> {
-  return db.rooms.where('userId').equals(userId).reverse().sortBy('createdAt');
+  // Get rooms owned by user + rooms where user is collaborator
+  const allRooms = await db.rooms.toArray();
+  return allRooms
+    .filter(r => r.userId === userId || (r.collaborators && r.collaborators.includes(userId)))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 /** Get all public rooms */
