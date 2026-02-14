@@ -1,1 +1,11 @@
-/SYNAPTIC_MASTER_PROMPT.md
+node_modules/
+.next/
+out/
+.env
+.env.local
+.env.production
+*.tsbuildinfo
+next-env.d.ts
+.partykit/
+.DS_Store
+tsconfig.tsbuildinfo
