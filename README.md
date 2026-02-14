@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="https://image.pollinations.ai/prompt/minimalist%20brain%20logo%20purple%20gradient%20dark%20background%20neural%20network%20glowing%20synapses?width=200&height=200&nologo=true&seed=42" alt="Synaptic Logo" width="120" />
-</p>
-
 <h1 align="center">🧠 Synaptic — The Generative Memory Palace</h1>
 
 <p align="center">
