@@ -1,0 +1,6 @@
+{
+  "name": "synaptic",
+  "url": "http://localhost:3000",
+  "$schema": "https://unpkg.com/partykit/schema.json",
+  "main": "partykit/server.ts"
+}
