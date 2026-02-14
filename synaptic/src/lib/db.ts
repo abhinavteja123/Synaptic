@@ -1,122 +1,203 @@
 /**
- * Synaptic – Dexie.js Database
- * Client-side IndexedDB storage for rooms, sessions, and user data.
+ * Synaptic – Supabase Database Layer
+ * All room, session, and user CRUD operations backed by Supabase PostgreSQL.
+ * Exported function signatures are identical to the previous Dexie.js version
+ * so every consumer works without changes.
  */
 
-import Dexie, { type Table } from 'dexie';
-import type { MemoryRoom, RoomSession, ChatMessage } from '@/types/room';
-import type { Mood } from '@/types/scene';
+import { supabase } from '@/lib/supabase';
+import type { MemoryRoom, RoomSession, Photo } from '@/types/room';
 
 // ============================================
-//  Database Schema
+//  Type Conversions (camelCase ↔ snake_case)
 // ============================================
 
-export class SynapticDB extends Dexie {
-  rooms!: Table<MemoryRoom, string>;
-  sessions!: Table<RoomSession, string>;
-  users!: Table<UserRecord, string>;
-
-  constructor() {
-    super('SynapticDB');
-
-    this.version(1).stores({
-      rooms: 'id, userId, title, isPublic, createdAt, updatedAt',
-      sessions: 'id, roomId, startedAt',
-      users: 'id, email, name, createdAt',
-    });
-
-    // v2: add email index for login lookup
-    this.version(2).stores({
-      rooms: 'id, userId, title, isPublic, createdAt, updatedAt',
-      sessions: 'id, roomId, startedAt',
-      users: 'id, &email, name, createdAt',
-    });
-  }
-}
-
-/** Local user record */
+/** Local user record – mirrors the "users" table */
 export interface UserRecord {
   id: string;
   email: string;
   name: string;
   passwordHash: string;
   avatar?: string;
+  bio?: string;
   createdAt: Date;
 }
 
-// Singleton database instance
-export const db = new SynapticDB();
+/** Convert a Supabase row (snake_case) to a MemoryRoom (camelCase) */
+function rowToRoom(row: Record<string, unknown>): MemoryRoom {
+  return {
+    id: row.id as string,
+    userId: row.user_id as string,
+    title: row.title as string,
+    description: (row.description as string) || '',
+    tags: (row.tags as string[]) || [],
+    photos: (row.photos as Photo[]) || [],
+    sceneData: row.scene_data as MemoryRoom['sceneData'],
+    audioNarration: row.audio_narration as string | undefined,
+    narrationAudioUrl: row.narration_audio_url as string | undefined,
+    theme: row.theme as string | undefined,
+    collaborators: (row.collaborators as string[]) || [],
+    inviteCode: row.invite_code as string | undefined,
+    isPublic: row.is_public as boolean,
+    isLegacy: row.is_legacy as boolean,
+    lockedUntil: row.locked_until ? new Date(row.locked_until as string) : undefined,
+    relationshipStory: row.relationship_story as string | undefined,
+    entryMood: row.entry_mood as string | undefined,
+    exitMood: row.exit_mood as string | undefined,
+    location: row.location as string | undefined,
+    legacyPersonName: row.legacy_person_name as string | undefined,
+    legacyRelationship: row.legacy_relationship as string | undefined,
+    visitCount: (row.visit_count as number) || 0,
+    createdAt: new Date(row.created_at as string),
+    updatedAt: new Date(row.updated_at as string),
+  };
+}
+
+/** Convert a MemoryRoom (camelCase) to a Supabase insert/update payload (snake_case) */
+function roomToRow(room: MemoryRoom): Record<string, unknown> {
+  // Only include fields with actual values to avoid errors from missing columns
+  const row: Record<string, unknown> = {
+    id: room.id,
+    user_id: room.userId,
+    title: room.title,
+    description: room.description,
+    tags: room.tags,
+    photos: room.photos,
+    scene_data: room.sceneData,
+    is_public: room.isPublic,
+    is_legacy: room.isLegacy,
+    visit_count: room.visitCount,
+    created_at: room.createdAt instanceof Date ? room.createdAt.toISOString() : room.createdAt,
+    updated_at: new Date().toISOString(),
+  };
+
+  // Optional fields — only include when set
+  if (room.audioNarration !== undefined) row.audio_narration = room.audioNarration;
+  if (room.narrationAudioUrl !== undefined) row.narration_audio_url = room.narrationAudioUrl;
+  if (room.theme !== undefined) row.theme = room.theme;
+  if (room.collaborators?.length) row.collaborators = room.collaborators;
+  if (room.inviteCode !== undefined) row.invite_code = room.inviteCode;
+  if (room.lockedUntil !== undefined) row.locked_until = room.lockedUntil?.toISOString() ?? null;
+  if (room.relationshipStory !== undefined) row.relationship_story = room.relationshipStory;
+  if (room.entryMood !== undefined) row.entry_mood = room.entryMood;
+  if (room.exitMood !== undefined) row.exit_mood = room.exitMood;
+  if (room.legacyPersonName !== undefined) row.legacy_person_name = room.legacyPersonName;
+  if (room.legacyRelationship !== undefined) row.legacy_relationship = room.legacyRelationship;
+  if (room.location !== undefined) row.location = room.location;
+
+  return row;
+}
+
+function rowToUser(row: Record<string, unknown>): UserRecord {
+  return {
+    id: row.id as string,
+    email: row.email as string,
+    name: row.name as string,
+    passwordHash: row.password_hash as string,
+    avatar: row.avatar as string | undefined,
+    bio: row.bio as string | undefined,
+    createdAt: new Date(row.created_at as string),
+  };
+}
+
+function userToRow(user: UserRecord): Record<string, unknown> {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    password_hash: user.passwordHash,
+    avatar: user.avatar ?? null,
+    bio: user.bio ?? null,
+    created_at: user.createdAt instanceof Date ? user.createdAt.toISOString() : user.createdAt,
+  };
+}
 
 // ============================================
 //  Room Helpers
 // ============================================
 
-/** Save or update a memory room */
+/** Save or update a memory room (upsert) */
 export async function saveRoom(room: MemoryRoom): Promise<string> {
   room.updatedAt = new Date();
-  await db.rooms.put(room);
+  const row = roomToRow(room);
+  const { error } = await supabase.from('rooms').upsert(row);
+  if (error) {
+    // If the error is about a missing column, try stripping optional columns one by one
+    console.error('saveRoom error:', error.message);
+    // Re-throw so callers can handle
+    throw new Error(`saveRoom failed: ${error.message}`);
+  }
   return room.id;
 }
 
 /** Get a single room by ID */
 export async function getRoomById(id: string): Promise<MemoryRoom | undefined> {
-  return db.rooms.get(id);
+  const { data, error } = await supabase.from('rooms').select('*').eq('id', id).single();
+  if (error || !data) return undefined;
+  return rowToRoom(data);
 }
 
-/** Get all rooms for a specific user, newest first */
+/** Get all rooms for a specific user (owned + collaborator), newest first */
 export async function getRoomsByUser(userId: string): Promise<MemoryRoom[]> {
-  // Get rooms owned by user + rooms where user is collaborator
-  const allRooms = await db.rooms.toArray();
-  return allRooms
-    .filter(r => r.userId === userId || (r.collaborators && r.collaborators.includes(userId)))
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const { data, error } = await supabase
+    .from('rooms')
+    .select('*')
+    .or(`user_id.eq.${userId},collaborators.cs.{${userId}}`)
+    .order('created_at', { ascending: false });
+  if (error || !data) return [];
+  return data.map(rowToRoom);
 }
 
 /** Get all public rooms */
 export async function getPublicRooms(): Promise<MemoryRoom[]> {
-  return db.rooms.filter((room) => room.isPublic === true).reverse().sortBy('createdAt');
+  const { data, error } = await supabase
+    .from('rooms')
+    .select('*')
+    .eq('is_public', true)
+    .order('created_at', { ascending: false });
+  if (error || !data) return [];
+  return data.map(rowToRoom);
 }
 
 /** Delete a room by ID */
 export async function deleteRoom(id: string): Promise<void> {
-  await db.rooms.delete(id);
-  // Also clean up associated sessions
-  const sessions = await db.sessions.where('roomId').equals(id).toArray();
-  await db.sessions.bulkDelete(sessions.map((s) => s.id));
+  // Sessions cascade-delete via FK
+  const { error } = await supabase.from('rooms').delete().eq('id', id);
+  if (error) throw new Error(`deleteRoom failed: ${error.message}`);
 }
 
 /** Increment visit count */
 export async function incrementVisitCount(id: string): Promise<void> {
-  await db.rooms.where('id').equals(id).modify((room) => {
-    room.visitCount = (room.visitCount || 0) + 1;
-  });
+  const { data } = await supabase.from('rooms').select('visit_count').eq('id', id).single();
+  const current = (data?.visit_count as number) || 0;
+  await supabase.from('rooms').update({ visit_count: current + 1, updated_at: new Date().toISOString() }).eq('id', id);
 }
 
 /** Add photos to an existing room */
-export async function addPhotosToRoom(id: string, newPhotos: import('@/types/room').Photo[]): Promise<void> {
-  await db.rooms.where('id').equals(id).modify((room) => {
-    room.photos = [...(room.photos || []), ...newPhotos];
-    room.updatedAt = new Date();
-  });
+export async function addPhotosToRoom(id: string, newPhotos: Photo[]): Promise<void> {
+  const room = await getRoomById(id);
+  if (!room) return;
+  room.photos = [...room.photos, ...newPhotos];
+  await saveRoom(room);
 }
 
 /** Remove a photo from a room by photo ID */
 export async function removePhotoFromRoom(roomId: string, photoId: string): Promise<void> {
-  await db.rooms.where('id').equals(roomId).modify((room) => {
-    room.photos = (room.photos || []).filter(p => p.id !== photoId);
-    room.updatedAt = new Date();
-  });
+  const room = await getRoomById(roomId);
+  if (!room) return;
+  room.photos = room.photos.filter(p => p.id !== photoId);
+  await saveRoom(room);
 }
 
 /** Update a photo caption in a room */
 export async function updatePhotoCaption(roomId: string, photoId: string, caption: string): Promise<void> {
-  await db.rooms.where('id').equals(roomId).modify((room) => {
-    const photo = (room.photos || []).find(p => p.id === photoId);
-    if (photo) {
-      photo.caption = caption;
-      room.updatedAt = new Date();
-    }
-  });
+  const room = await getRoomById(roomId);
+  if (!room) return;
+  const photo = room.photos.find(p => p.id === photoId);
+  if (photo) {
+    photo.caption = caption;
+    await saveRoom(room);
+  }
 }
 
 // ============================================
@@ -125,13 +206,35 @@ export async function updatePhotoCaption(roomId: string, photoId: string, captio
 
 /** Save a multiplayer session */
 export async function saveSession(session: RoomSession): Promise<string> {
-  await db.sessions.put(session);
+  const row = {
+    id: session.id,
+    room_id: session.roomId,
+    participants: session.participants,
+    chat_history: session.chatHistory,
+    current_mood: session.currentMood,
+    started_at: session.startedAt instanceof Date ? session.startedAt.toISOString() : session.startedAt,
+  };
+  const { error } = await supabase.from('sessions').upsert(row);
+  if (error) throw new Error(`saveSession failed: ${error.message}`);
   return session.id;
 }
 
 /** Get sessions for a room */
 export async function getSessionsByRoom(roomId: string): Promise<RoomSession[]> {
-  return db.sessions.where('roomId').equals(roomId).reverse().sortBy('startedAt');
+  const { data, error } = await supabase
+    .from('sessions')
+    .select('*')
+    .eq('room_id', roomId)
+    .order('started_at', { ascending: false });
+  if (error || !data) return [];
+  return data.map(row => ({
+    id: row.id,
+    roomId: row.room_id,
+    participants: row.participants || [],
+    chatHistory: row.chat_history || [],
+    currentMood: row.current_mood || 'neutral',
+    startedAt: new Date(row.started_at),
+  }));
 }
 
 // ============================================
@@ -140,15 +243,81 @@ export async function getSessionsByRoom(roomId: string): Promise<RoomSession[]> 
 
 /** Save or update a user record */
 export async function saveUser(user: UserRecord): Promise<void> {
-  await db.users.put(user);
+  const { error } = await supabase.from('users').upsert(userToRow(user));
+  if (error) throw new Error(`saveUser failed: ${error.message}`);
 }
 
 /** Get user by ID */
 export async function getUserById(id: string): Promise<UserRecord | undefined> {
-  return db.users.get(id);
+  const { data, error } = await supabase.from('users').select('*').eq('id', id).single();
+  if (error || !data) return undefined;
+  return rowToUser(data);
 }
 
 /** Get user by email */
 export async function getUserByEmail(email: string): Promise<UserRecord | undefined> {
-  return db.users.where('email').equalsIgnoreCase(email).first();
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .ilike('email', email)
+    .single();
+  if (error || !data) return undefined;
+  return rowToUser(data);
 }
+
+/** Update user name */
+export async function updateUserName(id: string, name: string): Promise<void> {
+  const { error } = await supabase.from('users').update({ name }).eq('id', id);
+  if (error) throw new Error(`updateUserName failed: ${error.message}`);
+}
+
+/** Update user bio */
+export async function updateUserBio(id: string, bio: string): Promise<void> {
+  const { error } = await supabase.from('users').update({ bio }).eq('id', id);
+  if (error) throw new Error(`updateUserBio failed: ${error.message}`);
+}
+
+// ============================================
+//  Legacy Compatibility
+// ============================================
+//  The old Dexie code exposed `db` directly.
+//  Some files (useAuth.tsx, profile page) use `db.users.where(...)`.
+//  We provide a thin compatibility object so those files still compile.
+//  After migration, gradually remove direct `db.*` usage.
+// ============================================
+
+const usersProxy = {
+  where: (field: string) => ({
+    equalsIgnoreCase: (value: string) => ({
+      first: async () => {
+        const user = await getUserByEmail(value);
+        return user;
+      },
+    }),
+    equals: (value: string) => ({
+      first: async () => {
+        if (field === 'id') return getUserById(value);
+        if (field === 'email') return getUserByEmail(value);
+        return undefined;
+      },
+    }),
+  }),
+  put: async (user: UserRecord) => {
+    await saveUser(user);
+  },
+  get: async (id: string) => {
+    return getUserById(id);
+  },
+};
+
+export const db = {
+  users: usersProxy as unknown as {
+    where: (field: string) => {
+      equalsIgnoreCase: (value: string) => { first: () => Promise<UserRecord | undefined> };
+      equals: (value: string) => { first: () => Promise<UserRecord | undefined> };
+    };
+    put: (user: UserRecord) => Promise<void>;
+    get: (id: string) => Promise<UserRecord | undefined>;
+  },
+};
+

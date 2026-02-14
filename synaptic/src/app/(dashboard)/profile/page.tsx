@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { Brain, Camera, Calendar, Heart, Sparkles, ArrowLeft, Edit2, Check } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import { useAuth } from '@/hooks/useAuth';
-import { getRoomsByUser, db } from '@/lib/db';
+import { getRoomsByUser, updateUserName, updateUserBio, getUserById } from '@/lib/db';
 import { ROOM_THEMES } from '@/lib/constants';
 import type { MemoryRoom } from '@/types/room';
 
@@ -35,9 +35,11 @@ export default function ProfilePage() {
     try {
       const userRooms = await getRoomsByUser(user?.id || 'anonymous');
       setRooms(userRooms);
-      // Load bio from local storage
-      const savedBio = localStorage.getItem(`synaptic-bio-${user?.id}`);
-      if (savedBio) setBio(savedBio);
+      // Load bio from Supabase user record
+      if (user?.id) {
+        const userRecord = await getUserById(user.id);
+        if (userRecord?.bio) setBio(userRecord.bio);
+      }
     } catch (err) {
       console.error('Failed to load profile:', err);
     } finally {
@@ -48,7 +50,7 @@ export default function ProfilePage() {
   async function handleSaveName() {
     if (!user || !nameDraft.trim()) return;
     try {
-      await db.users.where('id').equals(user.id).modify({ name: nameDraft.trim() });
+      await updateUserName(user.id, nameDraft.trim());
       // Reload page to reflect in auth
       window.location.reload();
     } catch (err) {
@@ -56,11 +58,15 @@ export default function ProfilePage() {
     }
   }
 
-  function handleSaveBio() {
+  async function handleSaveBio() {
     if (!user) return;
-    localStorage.setItem(`synaptic-bio-${user.id}`, bioDraft);
-    setBio(bioDraft);
-    setEditingBio(false);
+    try {
+      await updateUserBio(user.id, bioDraft);
+      setBio(bioDraft);
+      setEditingBio(false);
+    } catch (err) {
+      console.error('Failed to update bio:', err);
+    }
   }
 
   // Compute stats

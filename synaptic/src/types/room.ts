@@ -166,6 +166,10 @@ export interface MemoryRoom {
   lockedUntil?: Date;
   /** AI-generated relationship story */
   relationshipStory?: string;
+  /** Location where memory happened (city, place name, etc.) */
+  location?: string;
+  /** GPS coordinates [lat, lng] */
+  coordinates?: [number, number];
   /** Mood check-in on entry */
   entryMood?: string;
   /** Mood check-in on exit */

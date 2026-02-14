@@ -5,6 +5,8 @@ import { motion } from 'framer-motion';
 import { Brain, Camera, Users, Sparkles, Heart, ArrowRight } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
+import { DEMO_ROOMS } from '@/lib/demoRooms';
+import RoomCard from '@/components/ui/RoomCard';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -89,8 +91,8 @@ export default function HomePage() {
               Create Your First Room
               <ArrowRight className="h-5 w-5" />
             </Link>
-            <Link href="/gallery" className="btn-secondary px-8 py-4 text-lg">
-              Explore Gallery
+            <Link href="/explore" className="btn-secondary px-8 py-4 text-lg">
+              Explore Rooms
             </Link>
           </div>
         </motion.div>
@@ -176,6 +178,51 @@ export default function HomePage() {
               <p className="text-sm text-white/50">{s.desc}</p>
             </motion.div>
           ))}
+        </div>
+      </section>
+
+      {/* ====== DEMO ROOMS ====== */}
+      <section className="mx-auto max-w-7xl px-6 py-24">
+        <motion.h2
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          variants={fadeUp}
+          custom={0}
+          className="text-center text-3xl font-bold sm:text-4xl mb-4"
+        >
+          Try Demo Rooms
+        </motion.h2>
+        <motion.p
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          variants={fadeUp}
+          custom={1}
+          className="text-center text-white/50 mb-12 max-w-lg mx-auto"
+        >
+          Step into pre-built memory rooms — no sign-up needed
+        </motion.p>
+
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {DEMO_ROOMS.map((room, i) => (
+            <motion.div
+              key={room.id}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              custom={i + 1}
+            >
+              <RoomCard room={room} />
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="text-center mt-8">
+          <Link href="/explore" className="text-sm text-primary-400 hover:text-primary-300 transition-colors inline-flex items-center gap-1">
+            View all rooms <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
       </section>
 

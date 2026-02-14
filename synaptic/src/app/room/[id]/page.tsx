@@ -9,6 +9,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { getRoomById, incrementVisitCount, addPhotosToRoom, saveRoom, removePhotoFromRoom, updatePhotoCaption } from '@/lib/db';
+import { DEMO_ROOMS } from '@/lib/demoRooms';
 import { convertToBase64 } from '@/lib/utils/imageProcessing';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
 import { useAuth } from '@/hooks/useAuth';
@@ -145,10 +146,10 @@ export default function RoomPage() {
     enabled: true,
   });
 
-  // Theme → initial mood mapping
+  // Theme → initial mood mapping (default: neutral)
   const themeMoodMap: Record<string, Mood> = {
-    valentine: 'joyful', love: 'joyful', friends: 'content', family: 'content',
-    siblings: 'content', adventure: 'joyful', nostalgia: 'melancholic', midnight: 'melancholic',
+    valentine: 'neutral', love: 'neutral', friends: 'neutral', family: 'neutral',
+    siblings: 'neutral', adventure: 'neutral', nostalgia: 'neutral', midnight: 'neutral',
   };
 
   // Sentiment-based mood – initialised from theme, updated by chat / user / entry-mood
@@ -198,7 +199,9 @@ export default function RoomPage() {
   useEffect(() => {
     async function loadRoom() {
       try {
-        let data = await getRoomById(roomId);
+        // Check demo rooms first (no auth / DB needed)
+        const demoRoom = DEMO_ROOMS.find(r => r.id === roomId);
+        let data: MemoryRoom | undefined = demoRoom ? { ...demoRoom } : await getRoomById(roomId);
 
         // If not in local IndexedDB, try to fetch from PartyKit (another user shared this room)
         if (!data) {
@@ -217,9 +220,11 @@ export default function RoomPage() {
         }
 
         if (!data) {
-          router.push('/gallery');
+          router.push('/explore');
           return;
         }
+
+        const isDemo = roomId.startsWith('demo-');
 
         // Inject uploaded photos as framed 3D objects into the scene
         if (data.photos && data.photos.length > 0) {
@@ -232,7 +237,11 @@ export default function RoomPage() {
         if (data.theme && ROOM_THEMES[data.theme]) setTheme(data.theme);
         // Show mood check-in after welcome toast
         setTimeout(() => setShowMoodCheckin(true), 4200);
-        await incrementVisitCount(roomId);
+
+        // Skip DB operations for demo rooms
+        if (!isDemo) {
+          await incrementVisitCount(roomId);
+        }
 
         // Sync room data to PartyKit so other users can access it via shared links
         try {

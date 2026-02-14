@@ -232,9 +232,7 @@ export default function LoginPage() {
             )}
           </p>
 
-          <p className="mt-4 text-xs text-white/30 text-center">
-            Your data is stored locally in your browser.
-          </p>
+
         </div>
       </motion.div>
     </div>

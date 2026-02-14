@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Brain, Menu, X, LogOut, User } from 'lucide-react';
+import { Brain, Menu, X, LogOut, User, Clock, MapPin } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -35,6 +35,16 @@ export default function Header() {
           {isLoggedIn && (
             <Link href="/gallery" className="text-sm text-white/70 hover:text-white transition-colors">
               My Rooms
+            </Link>
+          )}
+          {isLoggedIn && (
+            <Link href="/timeline" className="text-sm text-white/70 hover:text-white transition-colors flex items-center gap-1">
+              <Clock className="h-3.5 w-3.5" /> Timeline
+            </Link>
+          )}
+          {isLoggedIn && (
+            <Link href="/map" className="text-sm text-white/70 hover:text-white transition-colors flex items-center gap-1">
+              <MapPin className="h-3.5 w-3.5" /> Map
             </Link>
           )}
           {isLoggedIn && (
@@ -86,6 +96,16 @@ export default function Header() {
           {isLoggedIn && (
             <Link href="/gallery" className="block text-sm text-white/70 hover:text-white" onClick={() => setMenuOpen(false)}>
               My Rooms
+            </Link>
+          )}
+          {isLoggedIn && (
+            <Link href="/timeline" className="block text-sm text-white/70 hover:text-white" onClick={() => setMenuOpen(false)}>
+              Timeline
+            </Link>
+          )}
+          {isLoggedIn && (
+            <Link href="/map" className="block text-sm text-white/70 hover:text-white" onClick={() => setMenuOpen(false)}>
+              Map
             </Link>
           )}
           {isLoggedIn && (

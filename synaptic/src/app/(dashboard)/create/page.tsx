@@ -6,7 +6,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Sparkles, Mic, Square } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sparkles, Mic, Square, Pencil, Check } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import PhotoUpload from '@/components/ui/PhotoUpload';
 import LoadingRoom from '@/components/ui/LoadingRoom';
@@ -33,6 +33,8 @@ export default function CreateRoomPage() {
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoCaptions, setPhotoCaptions] = useState<Record<number, string>>({});
   const [captioningIdx, setCaptioningIdx] = useState<Set<number>>(new Set());
+  const [editingCaptionIdx, setEditingCaptionIdx] = useState<number | null>(null);
+  const [editingCaptionText, setEditingCaptionText] = useState('');
   const [description, setDescription] = useState('');
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState('');
@@ -40,6 +42,7 @@ export default function CreateRoomPage() {
   const [isLegacy, setIsLegacy] = useState(false);
   const [roomTheme, setRoomTheme] = useState('valentine');
   const [lockDate, setLockDate] = useState('');
+  const [location, setLocation] = useState('');
   const [voiceNotes, setVoiceNotes] = useState<Record<number, string>>({});
   const [recordingIdx, setRecordingIdx] = useState<number | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -180,6 +183,7 @@ export default function CreateRoomPage() {
         photos: compressedPhotos,
         sceneData: sceneData.sceneData,
         theme: roomTheme,
+        location: location.trim() || undefined,
         isPublic,
         isLegacy,
         lockedUntil: lockDate ? new Date(lockDate) : undefined,
@@ -256,10 +260,49 @@ export default function CreateRoomPage() {
                       <div className="flex-1 min-w-0">
                         {captioningIdx.has(i) ? (
                           <span className="text-xs text-purple-400 animate-pulse">Generating caption...</span>
+                        ) : editingCaptionIdx === i ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="text"
+                              value={editingCaptionText}
+                              onChange={(e) => setEditingCaptionText(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  setPhotoCaptions(prev => ({ ...prev, [i]: editingCaptionText.trim() }));
+                                  setEditingCaptionIdx(null);
+                                }
+                                if (e.key === 'Escape') setEditingCaptionIdx(null);
+                              }}
+                              autoFocus
+                              className="flex-1 bg-white/[0.06] border border-purple-400/30 rounded px-2 py-1 text-sm text-white/90 outline-none focus:border-purple-400/60 placeholder-white/30"
+                              placeholder="Enter caption..."
+                            />
+                            <button
+                              onClick={() => {
+                                setPhotoCaptions(prev => ({ ...prev, [i]: editingCaptionText.trim() }));
+                                setEditingCaptionIdx(null);
+                              }}
+                              className="text-green-400 hover:text-green-300 p-0.5"
+                              title="Save caption"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         ) : photoCaptions[i] ? (
-                          <span className="text-sm text-white/70 italic truncate block">&ldquo;{photoCaptions[i]}&rdquo;</span>
+                          <span
+                            onClick={() => { setEditingCaptionIdx(i); setEditingCaptionText(photoCaptions[i]); }}
+                            className="text-sm text-white/70 italic truncate block cursor-pointer hover:text-white/90 transition-colors"
+                            title="Click to edit caption"
+                          >&ldquo;{photoCaptions[i]}&rdquo;</span>
                         ) : (
-                          <span className="text-xs text-white/30 truncate block">{file.name}</span>
+                          <input
+                            type="text"
+                            value=""
+                            onChange={(e) => setPhotoCaptions(prev => ({ ...prev, [i]: e.target.value }))}
+                            onFocus={() => { setEditingCaptionIdx(i); setEditingCaptionText(''); }}
+                            className="w-full bg-transparent border-none outline-none text-xs text-white/30 placeholder-white/30"
+                            placeholder={file.name + ' — click to add caption'}
+                          />
                         )}
                         {voiceNotes[i] && (
                           <div className="flex items-center gap-1.5 mt-1">
@@ -268,6 +311,16 @@ export default function CreateRoomPage() {
                           </div>
                         )}
                       </div>
+                      {/* Edit caption button */}
+                      {!captioningIdx.has(i) && photoCaptions[i] && editingCaptionIdx !== i && (
+                        <button
+                          onClick={() => { setEditingCaptionIdx(i); setEditingCaptionText(photoCaptions[i]); }}
+                          className="flex items-center p-1.5 rounded-lg bg-white/[0.06] border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-all"
+                          title="Edit caption"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                      )}
                       {/* Voice note record button */}
                       {recordingIdx === i ? (
                         <button
@@ -330,6 +383,18 @@ export default function CreateRoomPage() {
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
                 placeholder="e.g., travel, family, celebration"
+                className="w-full rounded-xl bg-white/[0.04] border border-white/10 px-4 py-3 text-sm text-white placeholder-white/30 outline-none focus:border-primary-500/50"
+              />
+            </div>
+
+            {/* Location */}
+            <div>
+              <label className="block text-sm text-white/60 mb-1.5">📍 Location (optional)</label>
+              <input
+                type="text"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="e.g., Paris, France · Grandma's House · Central Park"
                 className="w-full rounded-xl bg-white/[0.04] border border-white/10 px-4 py-3 text-sm text-white placeholder-white/30 outline-none focus:border-primary-500/50"
               />
             </div>

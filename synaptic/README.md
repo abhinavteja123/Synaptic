@@ -41,8 +41,8 @@ Synaptic turns your photos and stories into **immersive 3D memory rooms** that y
 │  Three   │  R3F +    │ Llama 4   │ WebSocket │
 │  Fiber   │  Drei     │ Scout     │ Realtime  │
 ├──────────┴───────────┴───────────┴───────────┤
-│          Dexie.js (IndexedDB)                │
-│          Client-side storage                 │
+│         Supabase (PostgreSQL)                │
+│         Cloud-hosted database                │
 └──────────────────────────────────────────────┘
 ```
 
@@ -54,6 +54,7 @@ Synaptic turns your photos and stories into **immersive 3D memory rooms** that y
 
 - **Node.js** 18+
 - **Groq API Key** (free at [console.groq.com](https://console.groq.com))
+- **Supabase Project** (free at [supabase.com](https://supabase.com))
 
 ### 1. Clone & Install
 
@@ -71,7 +72,15 @@ Copy `.env.example` to `.env.local` and fill in:
 GROQ_API_KEY=your_groq_api_key
 JWT_SECRET=any_random_32char_string
 NEXT_PUBLIC_PARTYKIT_HOST=localhost:1999
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
+
+### 2b. Set Up Supabase Database
+
+1. Create a project at [supabase.com](https://supabase.com)
+2. Go to **SQL Editor** → paste and run the contents of `supabase-schema.sql`
+3. Copy your project URL and anon key into `.env.local`
 
 ### 3. Run Development Server
 
@@ -126,7 +135,8 @@ synaptic/
 │   │   ├── ai/                 # AI clients
 │   │   │   ├── gemini.ts       # Groq (Llama 4 Scout + Llama 3.3 70B)
 │   │   │   └── pollinations.ts # Panorama generation
-│   │   ├── db.ts               # Dexie IndexedDB
+│   │   ├── db.ts               # Supabase PostgreSQL
+│   │   ├── supabase.ts         # Supabase client config
 │   │   ├── auth.ts             # JWT auth config
 │   │   └── constants.ts        # Mood configs, settings
 │   └── types/                  # TypeScript interfaces
@@ -172,7 +182,7 @@ Tell Synaptic what happened — who was there, what made it special.
 | AI Text | Groq (Llama 3.3 70B) | Free tier |
 | AI Images | Pollinations.ai | Free |
 | Multiplayer | PartyKit (WebSocket) | Free tier |
-| Database | Dexie.js (IndexedDB) | Free |
+| Database | Supabase (PostgreSQL) | Free tier |
 | Auth | JWT (email/password) | Free |
 | Styling | Tailwind CSS + Framer Motion | Free |
 | State | Zustand | Free |

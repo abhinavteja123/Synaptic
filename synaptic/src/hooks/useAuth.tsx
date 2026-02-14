@@ -7,7 +7,7 @@
  */
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { db, type UserRecord } from '@/lib/db';
+import { getUserByEmail, saveUser, type UserRecord } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { nanoid } from 'nanoid';
 
@@ -61,8 +61,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signup = useCallback(async (name: string, email: string, password: string) => {
     try {
-      // Check if email already exists in local Dexie DB
-      const existing = await db.users.where('email').equalsIgnoreCase(email).first();
+      // Check if email already exists in Supabase
+      const existing = await getUserByEmail(email);
       if (existing) {
         return { success: false, error: 'An account with this email already exists' };
       }
@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const passwordHash = await bcrypt.hash(password, 10);
       const userId = nanoid();
 
-      // Save user to Dexie
+      // Save user to Supabase
       const userRecord: UserRecord = {
         id: userId,
         email: email.toLowerCase(),
@@ -84,13 +84,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         passwordHash,
         createdAt: new Date(),
       };
-      await db.users.put(userRecord);
+      await saveUser(userRecord);
 
-      // Call API to get JWT cookie
+      // Call API to get JWT cookie — pass the same userId that was saved to Supabase
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), email: email.toLowerCase() }),
+        body: JSON.stringify({ id: userId, name: name.trim(), email: email.toLowerCase() }),
       });
 
       const data = await res.json();
@@ -108,8 +108,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signin = useCallback(async (email: string, password: string) => {
     try {
-      // Find user in Dexie
-      const userRecord = await db.users.where('email').equalsIgnoreCase(email).first();
+      // Find user in Supabase
+      const userRecord = await getUserByEmail(email);
       if (!userRecord) {
         return { success: false, error: 'No account found with this email' };
       }
