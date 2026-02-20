@@ -24,6 +24,7 @@
 </p>
 
 ---
+**LINK : https://synaptic-rho.vercel.app/**
 
 ## 🎯 What is Synaptic?
 
